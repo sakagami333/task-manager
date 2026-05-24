@@ -78,6 +78,78 @@ function flattenToGantt(tasks: Task[], parentId?: string): GanttTask[] {
   return result;
 }
 
+// 日付を yyyy/mm/dd 形式にフォーマット
+function fmtDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}/${m}/${day}`;
+}
+
+// タイトル列幅（日付列の約20%増し）
+const NAME_COL_WIDTH = '144px';
+
+// カスタムタスクリストヘッダー
+// （gantt-task-react の内部 CSS クラス名をそのまま利用）
+function GanttTaskListHeader({ headerHeight, rowWidth, fontFamily, fontSize }: {
+  headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string;
+}) {
+  const sep = { height: headerHeight * 0.5, marginTop: headerHeight * 0.2 };
+  return (
+    <div className="_3_ygE" style={{ fontFamily, fontSize }}>
+      <div className="_1nBOt" style={{ height: headerHeight - 2 }}>
+        <div className="_WuQ0f" style={{ minWidth: NAME_COL_WIDTH }}>&nbsp;タスク名</div>
+        <div className="_2eZzQ" style={sep} />
+        <div className="_WuQ0f" style={{ minWidth: rowWidth }}>&nbsp;開始日</div>
+        <div className="_2eZzQ" style={sep} />
+        <div className="_WuQ0f" style={{ minWidth: rowWidth }}>&nbsp;期日</div>
+      </div>
+    </div>
+  );
+}
+
+// カスタムタスクリストテーブル（From/To を yyyy/mm/dd で表示）
+function GanttTaskListTable({ rowHeight, rowWidth, fontFamily, fontSize, tasks, setSelectedTask, onExpanderClick }: {
+  rowHeight: number; rowWidth: string; fontFamily: string; fontSize: string; locale: string;
+  tasks: GanttTask[]; selectedTaskId: string;
+  setSelectedTask: (id: string) => void;
+  onExpanderClick: (task: GanttTask) => void;
+}) {
+  return (
+    <div className="_3ZbQT" style={{ fontFamily, fontSize }}>
+      {tasks.map(t => {
+        const expanderSymbol = t.hideChildren === false ? '▼' : t.hideChildren === true ? '▶' : '';
+        return (
+          <div
+            className="_34SS0"
+            style={{ height: rowHeight }}
+            key={`${t.id}row`}
+            onClick={() => setSelectedTask(t.id)}
+          >
+            <div className="_3lLk3" style={{ minWidth: NAME_COL_WIDTH, maxWidth: NAME_COL_WIDTH }} title={t.name}>
+              <div className="_nI1Xw">
+                <div
+                  className={expanderSymbol ? '_2QjE6' : '_2TfEi'}
+                  onClick={e => { e.stopPropagation(); if (expanderSymbol) onExpanderClick(t); }}
+                >
+                  {expanderSymbol}
+                </div>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
+              </div>
+            </div>
+            <div className="_3lLk3" style={{ minWidth: rowWidth, maxWidth: rowWidth }}>
+              &nbsp;{fmtDate(t.start)}
+            </div>
+            <div className="_3lLk3" style={{ minWidth: rowWidth, maxWidth: rowWidth }}>
+              &nbsp;{fmtDate(t.end)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // カスタムツールチップ（日付を YYYY/MM/DD (曜日) で表示）
 function GanttTooltip({ task }: { task: GanttTask; fontSize: string; fontFamily: string }) {
   return (
@@ -138,7 +210,7 @@ export function GanttPage() {
     qc.invalidateQueries({ queryKey: ['tasks'] });
   };
 
-  const columnWidth = viewMode === ViewMode.Day ? 60 : viewMode === ViewMode.Week ? 120 : 280;
+  const columnWidth = viewMode === ViewMode.Day ? 36 : viewMode === ViewMode.Week ? 72 : 160;
 
   return (
     <div>
@@ -187,17 +259,19 @@ export function GanttPage() {
             viewMode={viewMode}
             onDateChange={handleDateChange}
             onProgressChange={() => {}}
-            listCellWidth="180px"
+            listCellWidth="90px"
             columnWidth={columnWidth}
             locale="ja-JP"
             todayColor="rgba(16,185,129,0.12)"
-            barCornerRadius={3}
-            barFill={70}
-            handleWidth={8}
-            headerHeight={50}
-            rowHeight={40}
-            fontSize="13px"
+            barCornerRadius={2}
+            barFill={65}
+            handleWidth={6}
+            headerHeight={38}
+            rowHeight={28}
+            fontSize="11px"
             TooltipContent={GanttTooltip}
+            TaskListHeader={GanttTaskListHeader}
+            TaskListTable={GanttTaskListTable}
           />
         </div>
       )}
