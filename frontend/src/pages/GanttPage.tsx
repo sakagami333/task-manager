@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { api } from '../api/client';
 import type { Task } from '../types';
+import { formatDate } from '../utils/date';
 
 // ステータス → 進捗率
 const STATUS_PROGRESS: Record<string, number> = {
@@ -75,6 +76,29 @@ function flattenToGantt(tasks: Task[], parentId?: string): GanttTask[] {
     if (t.children?.length) result.push(...flattenToGantt(t.children, String(t.id)));
   }
   return result;
+}
+
+// カスタムツールチップ（日付を YYYY/MM/DD (曜日) で表示）
+function GanttTooltip({ task }: { task: GanttTask; fontSize: string; fontFamily: string }) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '10px 14px', minWidth: 220, fontSize: 12 }}>
+      <p style={{ fontWeight: 600, color: '#1f2937', marginBottom: 8 }}>{task.name}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#4b5563' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <span style={{ color: '#9ca3af', width: 40 }}>開始日</span>
+          <span>{formatDate(task.start.toISOString())}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <span style={{ color: '#9ca3af', width: 40 }}>期日</span>
+          <span>{formatDate(task.end.toISOString())}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <span style={{ color: '#9ca3af', width: 40 }}>進捗</span>
+          <span>{task.progress}%</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const VIEW_LABELS: [ViewMode, string][] = [
@@ -173,6 +197,7 @@ export function GanttPage() {
             headerHeight={50}
             rowHeight={40}
             fontSize="13px"
+            TooltipContent={GanttTooltip}
           />
         </div>
       )}
