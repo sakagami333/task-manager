@@ -184,8 +184,8 @@ start.bat
 ## GitHub 運用ルール
 
 - 修正完了後は必ず GitHub へ push する
-- push 前に `git diff HEAD` を表示してユーザーに確認を取る
-- ユーザーの承認後に `git push` を実行する
+- push 前に `git diff HEAD --stat` を表示し、AskUserQuestion ツールのボタンでユーザーに可否を確認する
+- ユーザーが「プッシュする」を選択した場合のみ `git push` を実行する
 
 ---
 
