@@ -16,6 +16,7 @@ export function TaskForm({ initial, parentId, onSubmit, onCancel }: Props) {
     title: '',
     description: '',
     status: 'open',
+    start_date: null,
     due_date: null,
     project_id: null,
     parent_id: parentId ?? null,
@@ -46,6 +47,11 @@ export function TaskForm({ initial, parentId, onSubmit, onCancel }: Props) {
             <option value="resolved">解決済み</option>
             <option value="closed">完了</option>
           </select>
+        </div>
+        <div>{/* spacer */}</div>
+        <div>
+          <label className="form-label">開始日</label>
+          <input type="date" className="form-input" value={form.start_date ?? ''} onChange={e => set('start_date', e.target.value || null)} />
         </div>
         <div>
           <label className="form-label">期日</label>

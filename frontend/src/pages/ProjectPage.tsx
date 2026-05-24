@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faChartBar } from '@fortawesome/free-solid-svg-icons';
 import { api } from '../api/client';
 import { TaskTable } from '../components/TaskTable';
 import { TaskForm } from '../components/TaskForm';
@@ -42,9 +42,14 @@ export function ProjectPage() {
           <h1 className="text-lg font-bold text-gray-700">{project?.name ?? 'プロジェクト'}</h1>
           {project?.description && <span className="text-sm text-gray-500"><LinkifyText text={project.description} /></span>}
         </div>
-        <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(v => !v)}>
-          <FontAwesomeIcon icon={faPlus} />新しいタスク
-        </button>
+        <div className="flex items-center gap-2">
+          <Link to={`/projects/${projectId}/gantt`} className="btn-secondary flex items-center gap-1.5">
+            <FontAwesomeIcon icon={faChartBar} />ガントチャート
+          </Link>
+          <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(v => !v)}>
+            <FontAwesomeIcon icon={faPlus} />新しいタスク
+          </button>
+        </div>
       </div>
 
       {showForm && (

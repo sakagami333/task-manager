@@ -89,16 +89,16 @@ router.get('/:id', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { title, description = '', status = 'open', due_date = null, project_id = null, parent_id = null } = req.body;
+  const { title, description = '', status = 'open', start_date = null, due_date = null, project_id = null, parent_id = null } = req.body;
   if (!title) {
     log({ operation: 'CREATE', resource: 'task', result: 'failure', detail: 'title is required' });
     return res.status(400).json({ error: 'title is required' });
   }
   try {
     const result = db.prepare(`
-      INSERT INTO tasks (title, description, status, due_date, project_id, parent_id)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(title, description, status, due_date || null, project_id || null, parent_id || null);
+      INSERT INTO tasks (title, description, status, start_date, due_date, project_id, parent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(title, description, status, start_date || null, due_date || null, project_id || null, parent_id || null);
     const task = db.prepare(`
       SELECT t.*, p.name as project_name, p.color as project_color FROM tasks t
       LEFT JOIN projects p ON t.project_id = p.id WHERE t.id = ?
@@ -117,18 +117,19 @@ router.put('/:id', (req, res) => {
     log({ operation: 'UPDATE', resource: 'task', resourceId: Number(req.params.id), result: 'failure', detail: 'Not found' });
     return res.status(404).json({ error: 'Not found' });
   }
-  const { title, description, status, due_date, project_id, parent_id } = req.body;
+  const { title, description, status, start_date, due_date, project_id, parent_id } = req.body;
   try {
     db.prepare(`
       UPDATE tasks SET
         title = ?, description = ?, status = ?,
-        due_date = ?, project_id = ?, parent_id = ?,
+        start_date = ?, due_date = ?, project_id = ?, parent_id = ?,
         updated_at = datetime('now','localtime')
       WHERE id = ?
     `).run(
       title ?? task.title,
       description ?? task.description,
       status ?? task.status,
+      'start_date' in req.body ? (start_date || null) : task.start_date,
       'due_date' in req.body ? (due_date || null) : task.due_date,
       'project_id' in req.body ? (project_id || null) : task.project_id,
       'parent_id' in req.body ? (parent_id || null) : task.parent_id,
