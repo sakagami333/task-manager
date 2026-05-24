@@ -1,0 +1,18 @@
+# 依存パッケージ
+node_modules/
+
+# ビルド成果物
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# 機密情報
+backend/.env
+
+# データベース（ローカルのみで管理）
+backend/data/
+
+# 実行時ファイル
+.server-pids
+
+# Claude Code ローカル設定・メモリ
+.claude/
