@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Gantt, ViewMode } from 'gantt-task-react';
@@ -184,6 +184,7 @@ export function GanttPage() {
   const projectId = Number(id);
   const qc = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week);
+  const ganttWrapRef = useRef<HTMLDivElement>(null);
 
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: api.projects.list });
   const project = projects.find(p => p.id === projectId);
@@ -211,6 +212,46 @@ export function GanttPage() {
   };
 
   const columnWidth = viewMode === ViewMode.Day ? 36 : viewMode === ViewMode.Week ? 72 : 160;
+
+  // Week 表示時: ライブラリが描画した "W##" テキストを週の開始日 (yyyy/mm/dd) に置換
+  useEffect(() => {
+    if (viewMode !== ViewMode.Week || !ganttWrapRef.current || ganttTasks.length === 0) return;
+
+    // ライブラリと同じロジックでチャート表示開始日を算出
+    // (getMonday(最小start日) - 7日, preStepsCount=1)
+    const firstStart = ganttTasks.reduce(
+      (min, t) => (t.start < min ? t.start : min),
+      ganttTasks[0].start,
+    );
+    const dayOfWeek = firstStart.getDay();
+    const chartStart = new Date(firstStart);
+    chartStart.setDate(chartStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) - 7);
+    chartStart.setHours(0, 0, 0, 0);
+
+    const replace = () => {
+      ganttWrapRef.current?.querySelectorAll('text').forEach(el => {
+        if (/^W\d{2}$/.test(el.textContent ?? '')) {
+          const x = parseFloat(el.getAttribute('x') ?? '0');
+          const colIdx = Math.round(x / columnWidth);
+          const d = new Date(chartStart);
+          d.setDate(d.getDate() + colIdx * 7);
+          el.textContent = fmtDate(d);
+        }
+      });
+    };
+
+    // 描画完了後に置換（RAF + MutationObserver で再描画にも追従）
+    const raf = requestAnimationFrame(replace);
+    const observer = new MutationObserver(() => {
+      ganttWrapRef.current?.querySelectorAll('text').forEach(el => {
+        if (/^W\d{2}$/.test(el.textContent ?? '')) replace();
+      });
+    });
+    if (ganttWrapRef.current) {
+      observer.observe(ganttWrapRef.current, { childList: true, subtree: true });
+    }
+    return () => { cancelAnimationFrame(raf); observer.disconnect(); };
+  }, [ganttTasks, viewMode, columnWidth]);
 
   return (
     <div>
@@ -253,7 +294,7 @@ export function GanttPage() {
       ) : ganttTasks.length === 0 ? (
         <div className="card text-center py-16 text-gray-400">タスクがありません</div>
       ) : (
-        <div className="card overflow-hidden p-0">
+        <div className="card overflow-hidden p-0" ref={ganttWrapRef}>
           <Gantt
             tasks={ganttTasks}
             viewMode={viewMode}
