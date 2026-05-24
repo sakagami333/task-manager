@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { formatDateTime } from '../utils/date';
 
 const OPERATION_OPTIONS = ['', 'CREATE', 'UPDATE', 'DELETE', 'MOVE', 'REORDER'];
 const RESOURCE_OPTIONS  = ['', 'task', 'project', 'comment'];
@@ -89,7 +90,7 @@ export function LogsPage() {
                 const isFailure = log.result === 'failure';
                 return (
                   <tr key={log.id} className={`transition-colors ${isFailure ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50'}`}>
-                    <td className="table-cell text-xs text-gray-500 whitespace-nowrap">{log.operated_at}</td>
+                    <td className="table-cell text-xs text-gray-500 whitespace-nowrap">{formatDateTime(log.operated_at)}</td>
                     <td className="table-cell">
                       <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-medium ${opCfg.cls}`}>
                         {opCfg.label}

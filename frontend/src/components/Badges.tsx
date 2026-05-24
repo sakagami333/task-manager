@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircle, faSpinner, faPause, faCircleCheck, faCircleXmark } from '@fortawesome/free-solid-svg-icons';
 import type { Status } from '../types';
+import { formatDate } from '../utils/date';
 
 const STATUS_CONFIG: Record<Status, { label: string; cls: string; icon: typeof faCircle }> = {
   open:        { label: '未着手',   cls: 'bg-white text-gray-700 border border-gray-400', icon: faCircle },
@@ -33,5 +34,5 @@ export function DueDateLabel({ dueDate, status }: { dueDate: string | null; stat
     else if (diff === 0) { cls = 'text-red-500 font-semibold'; suffix = ' (今日)'; }
     else if (diff <= 3)  { cls = 'text-orange-600 font-medium'; suffix = ` (あと${diff}日)`; }
   }
-  return <span className={cls}>{dueDate}{suffix}</span>;
+  return <span className={cls}>{formatDate(dueDate)}{suffix}</span>;
 }

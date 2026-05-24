@@ -7,6 +7,7 @@ import { api } from '../api/client';
 import { TaskForm } from '../components/TaskForm';
 import { StatusBadge, DueDateLabel } from '../components/Badges';
 import { LinkifyText } from '../components/LinkifyText';
+import { formatDateTime } from '../utils/date';
 import type { Task } from '../types';
 
 function CommentsSection({ taskId }: { taskId: number }) {
@@ -55,7 +56,7 @@ function CommentsSection({ taskId }: { taskId: number }) {
           {comments.map(c => (
             <li key={c.id} className="bg-gray-50 border border-gray-200 rounded p-3 group">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-gray-400">{c.created_at.slice(0, 16)}</span>
+                <span className="text-xs text-gray-400">{formatDateTime(c.created_at)}</span>
                 <button
                   onClick={() => { if (confirm('このコメントを削除しますか？')) remove.mutate(c.id); }}
                   className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -189,11 +190,11 @@ export function TaskDetailPage() {
                   <td className="py-1.5 pr-4 text-gray-500 font-medium w-24">期日</td>
                   <td className="py-1.5"><DueDateLabel dueDate={task.due_date} status={task.status} /></td>
                   <td className="py-1.5 pr-4 text-gray-500 font-medium w-24">作成日時</td>
-                  <td className="py-1.5 text-gray-600">{task.created_at?.slice(0, 16)}</td>
+                  <td className="py-1.5 text-gray-600">{formatDateTime(task.created_at)}</td>
                 </tr>
                 <tr>
                   <td className="py-1.5 pr-4 text-gray-500 font-medium">更新日時</td>
-                  <td className="py-1.5 text-gray-600">{task.updated_at?.slice(0, 16)}</td>
+                  <td className="py-1.5 text-gray-600">{formatDateTime(task.updated_at)}</td>
                   {task.parent_id && (
                     <>
                       <td className="py-1.5 pr-4 text-gray-500 font-medium">親タスク</td>

@@ -7,6 +7,7 @@ import { api } from '../api/client';
 import type { Task, Status } from '../types';
 import { DueDateLabel } from './Badges';
 import { TaskForm } from './TaskForm';
+import { formatDateTime } from '../utils/date';
 
 const STATUS_OPTIONS: { value: Status; label: string }[] = [
   { value: 'open',        label: '未着手' },
@@ -185,7 +186,7 @@ function TaskRow({
           </select>
         </td>
         <td className="table-cell text-xs"><DueDateLabel dueDate={task.due_date} status={task.status} /></td>
-        <td className="table-cell text-xs text-gray-400">{task.updated_at?.slice(0, 16)}</td>
+        <td className="table-cell text-xs text-gray-400">{formatDateTime(task.updated_at)}</td>
         <td className="table-cell text-right">
           <button
             onClick={() => { if (confirm(`「${task.title}」を削除しますか？`)) deleteTask.mutate(task.id); }}
