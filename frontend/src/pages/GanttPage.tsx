@@ -235,7 +235,9 @@ export function GanttPage() {
           const colIdx = Math.round(x / columnWidth);
           const d = new Date(chartStart);
           d.setDate(d.getDate() + colIdx * 7);
-          el.textContent = fmtDate(d);
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          el.textContent = `${mm}/${dd}`;
         }
       });
     };
