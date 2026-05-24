@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, createContext, useContext, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Gantt, ViewMode } from 'gantt-task-react';
@@ -86,19 +86,27 @@ function fmtDate(d: Date): string {
   return `${y}/${m}/${day}`;
 }
 
-// タイトル列幅（日付列の約20%増し）
-const NAME_COL_WIDTH = '144px';
+// タスク名列幅を共有する Context
+interface GanttNameColCtx { width: number; onResizeStart: (e: React.MouseEvent) => void; }
+const GanttNameColContext = createContext<GanttNameColCtx>({ width: 216, onResizeStart: () => {} });
 
 // カスタムタスクリストヘッダー
 // （gantt-task-react の内部 CSS クラス名をそのまま利用）
 function GanttTaskListHeader({ headerHeight, rowWidth, fontFamily, fontSize }: {
   headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string;
 }) {
+  const { width: nameW, onResizeStart } = useContext(GanttNameColContext);
   const sep = { height: headerHeight * 0.5, marginTop: headerHeight * 0.2 };
   return (
     <div className="_3_ygE" style={{ fontFamily, fontSize }}>
       <div className="_1nBOt" style={{ height: headerHeight - 2 }}>
-        <div className="_WuQ0f" style={{ minWidth: NAME_COL_WIDTH }}>&nbsp;タスク名</div>
+        <div className="_WuQ0f" style={{ minWidth: nameW, maxWidth: nameW, position: 'relative' }}>
+          &nbsp;タスク名
+          <div
+            onMouseDown={onResizeStart}
+            style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 5, cursor: 'col-resize', borderRight: '2px solid #d1d5db', zIndex: 1 }}
+          />
+        </div>
         <div className="_2eZzQ" style={sep} />
         <div className="_WuQ0f" style={{ minWidth: rowWidth }}>&nbsp;開始日</div>
         <div className="_2eZzQ" style={sep} />
@@ -115,6 +123,7 @@ function GanttTaskListTable({ rowHeight, rowWidth, fontFamily, fontSize, tasks, 
   setSelectedTask: (id: string) => void;
   onExpanderClick: (task: GanttTask) => void;
 }) {
+  const { width: nameW } = useContext(GanttNameColContext);
   return (
     <div className="_3ZbQT" style={{ fontFamily, fontSize }}>
       {tasks.map(t => {
@@ -126,7 +135,7 @@ function GanttTaskListTable({ rowHeight, rowWidth, fontFamily, fontSize, tasks, 
             key={`${t.id}row`}
             onClick={() => setSelectedTask(t.id)}
           >
-            <div className="_3lLk3" style={{ minWidth: NAME_COL_WIDTH, maxWidth: NAME_COL_WIDTH }} title={t.name}>
+            <div className="_3lLk3" style={{ minWidth: nameW, maxWidth: nameW }} title={t.name}>
               <div className="_nI1Xw">
                 <div
                   className={expanderSymbol ? '_2QjE6' : '_2TfEi'}
@@ -185,6 +194,37 @@ export function GanttPage() {
   const qc = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week);
   const ganttWrapRef = useRef<HTMLDivElement>(null);
+
+  // タスク名列幅（localStorage で永続化、最小 80px、初期値 216px = 144×1.5）
+  const [nameWidth, setNameWidth] = useState<number>(() => {
+    try {
+      const v = localStorage.getItem('gantt-name-col-width');
+      return v ? Math.max(80, Number(v)) : 216;
+    } catch { return 216; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('gantt-name-col-width', String(nameWidth)); } catch { /* ignore */ }
+  }, [nameWidth]);
+  const nameWidthRef = useRef(nameWidth);
+  nameWidthRef.current = nameWidth;
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = nameWidthRef.current;
+    const onMove = (ev: MouseEvent) => setNameWidth(Math.max(80, startW + (ev.clientX - startX)));
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
+
+  const nameColCtx = useMemo<GanttNameColCtx>(
+    () => ({ width: nameWidth, onResizeStart: handleResizeStart }),
+    [nameWidth, handleResizeStart],
+  );
 
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: api.projects.list });
   const project = projects.find(p => p.id === projectId);
@@ -319,6 +359,7 @@ export function GanttPage() {
       ) : ganttTasks.length === 0 ? (
         <div className="card text-center py-16 text-gray-400">タスクがありません</div>
       ) : (
+        <GanttNameColContext.Provider value={nameColCtx}>
         <div className="card overflow-hidden p-0" ref={ganttWrapRef}>
           <Gantt
             tasks={ganttTasks}
@@ -340,6 +381,7 @@ export function GanttPage() {
             TaskListTable={GanttTaskListTable}
           />
         </div>
+        </GanttNameColContext.Provider>
       )}
 
       {/* 凡例 */}
