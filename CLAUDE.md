@@ -181,6 +181,14 @@ start.bat
 
 ---
 
+## GitHub 運用ルール
+
+- 修正完了後は必ず GitHub へ push する
+- push 前に `git diff HEAD` を表示してユーザーに確認を取る
+- ユーザーの承認後に `git push` を実行する
+
+---
+
 ## 過去の開発での注意点
 
 - **LinkifyText の regex**: `split()` と `test()` で同じ `g` フラグ付き regex を使い回すと `lastIndex` がずれてリンク判定が壊れる。`IS_URL = /^https?:\/\//`（`g` フラグなし）を別途定義して使うこと。
