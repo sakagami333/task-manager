@@ -213,24 +213,31 @@ export function GanttPage() {
 
   const columnWidth = viewMode === ViewMode.Day ? 36 : viewMode === ViewMode.Week ? 72 : 160;
 
-  // Week 表示時: ライブラリが描画した "W##" テキストを週の開始日 (yyyy/mm/dd) に置換
+  // ライブラリが描画した SVG テキストを修正:
+  //   - Week 表示: "W##" → 週の開始日 (mm/dd)
+  //   - Day  表示: "{曜日}, {日}" → 日付のみ表示、日曜=赤・土曜=青
   useEffect(() => {
-    if (viewMode !== ViewMode.Week || !ganttWrapRef.current || ganttTasks.length === 0) return;
+    if (!ganttWrapRef.current || ganttTasks.length === 0) return;
 
-    // ライブラリと同じロジックでチャート表示開始日を算出
-    // (getMonday(最小start日) - 7日, preStepsCount=1)
-    const firstStart = ganttTasks.reduce(
-      (min, t) => (t.start < min ? t.start : min),
-      ganttTasks[0].start,
-    );
-    const dayOfWeek = firstStart.getDay();
-    const chartStart = new Date(firstStart);
-    chartStart.setDate(chartStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) - 7);
-    chartStart.setHours(0, 0, 0, 0);
+    // Week モード用: チャート開始日を算出 (getMonday(最小start) - 7日)
+    let chartStart: Date | null = null;
+    if (viewMode === ViewMode.Week) {
+      const firstStart = ganttTasks.reduce(
+        (min, t) => (t.start < min ? t.start : min),
+        ganttTasks[0].start,
+      );
+      const dayOfWeek = firstStart.getDay();
+      chartStart = new Date(firstStart);
+      chartStart.setDate(chartStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) - 7);
+      chartStart.setHours(0, 0, 0, 0);
+    }
 
     const replace = () => {
       ganttWrapRef.current?.querySelectorAll('text').forEach(el => {
-        if (/^W\d{2}$/.test(el.textContent ?? '')) {
+        const text = el.textContent ?? '';
+
+        // Week 表示: "W##" → mm/dd
+        if (chartStart && /^W\d{2}$/.test(text)) {
           const x = parseFloat(el.getAttribute('x') ?? '0');
           const colIdx = Math.round(x / columnWidth);
           const d = new Date(chartStart);
@@ -238,6 +245,17 @@ export function GanttPage() {
           const mm = String(d.getMonth() + 1).padStart(2, '0');
           const dd = String(d.getDate()).padStart(2, '0');
           el.textContent = `${mm}/${dd}`;
+          return;
+        }
+
+        // Day 表示: "{曜日}, {日}" → 日付のみ、日曜=赤・土曜=青
+        const dayMatch = text.match(/^([日月火水木金土]), (\d{1,2})$/);
+        if (dayMatch) {
+          const [, weekday, dayNum] = dayMatch;
+          el.textContent = dayNum;
+          el.style.fill = weekday === '日' ? '#dc2626'  // 日曜日 → 赤
+                        : weekday === '土' ? '#2563eb'  // 土曜日 → 青
+                        : '';
         }
       });
     };
@@ -245,9 +263,14 @@ export function GanttPage() {
     // 描画完了後に置換（RAF + MutationObserver で再描画にも追従）
     const raf = requestAnimationFrame(replace);
     const observer = new MutationObserver(() => {
+      let needsReplace = false;
       ganttWrapRef.current?.querySelectorAll('text').forEach(el => {
-        if (/^W\d{2}$/.test(el.textContent ?? '')) replace();
+        const t = el.textContent ?? '';
+        if (/^W\d{2}$/.test(t) || /^[日月火水木金土], \d{1,2}$/.test(t)) {
+          needsReplace = true;
+        }
       });
+      if (needsReplace) replace();
     });
     if (ganttWrapRef.current) {
       observer.observe(ganttWrapRef.current, { childList: true, subtree: true });
