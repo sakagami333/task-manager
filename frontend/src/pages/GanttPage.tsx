@@ -78,6 +78,22 @@ function flattenToGantt(tasks: Task[], parentId?: string): GanttTask[] {
   return result;
 }
 
+// タスクのネスト深さを計算（project フィールドを再帰的に辿る）
+function buildDepthMap(tasks: GanttTask[]): Map<string, number> {
+  const idToTask = new Map(tasks.map(t => [t.id, t]));
+  const memo = new Map<string, number>();
+  const getDepth = (id: string): number => {
+    if (memo.has(id)) return memo.get(id)!;
+    const task = idToTask.get(id);
+    if (!task || !task.project) { memo.set(id, 0); return 0; }
+    const d = 1 + getDepth(task.project);
+    memo.set(id, d);
+    return d;
+  };
+  tasks.forEach(t => getDepth(t.id));
+  return memo;
+}
+
 // 日付を yyyy/mm/dd 形式にフォーマット
 function fmtDate(d: Date): string {
   const y = d.getFullYear();
@@ -124,10 +140,12 @@ function GanttTaskListTable({ rowHeight, rowWidth, fontFamily, fontSize, tasks, 
   onExpanderClick: (task: GanttTask) => void;
 }) {
   const { width: nameW } = useContext(GanttNameColContext);
+  const depthMap = buildDepthMap(tasks);
   return (
     <div className="_3ZbQT" style={{ fontFamily, fontSize }}>
       {tasks.map(t => {
         const expanderSymbol = t.hideChildren === false ? '▼' : t.hideChildren === true ? '▶' : '';
+        const depth = depthMap.get(t.id) ?? 0;
         return (
           <div
             className="_34SS0"
@@ -136,7 +154,7 @@ function GanttTaskListTable({ rowHeight, rowWidth, fontFamily, fontSize, tasks, 
             onClick={() => setSelectedTask(t.id)}
           >
             <div className="_3lLk3" style={{ minWidth: nameW, maxWidth: nameW }} title={t.name}>
-              <div className="_nI1Xw">
+              <div className="_nI1Xw" style={{ paddingLeft: `${depth}ch` }}>
                 <div
                   className={expanderSymbol ? '_2QjE6' : '_2TfEi'}
                   onClick={e => { e.stopPropagation(); if (expanderSymbol) onExpanderClick(t); }}
