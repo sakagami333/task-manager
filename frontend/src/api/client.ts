@@ -32,6 +32,8 @@ export const api = {
     delete: (id: number) => request<void>(`/tasks/${id}`, { method: 'DELETE' }),
     move: (id: number, parentId: number | null, beforeId: number | null) =>
       request<void>('/tasks/move', { method: 'POST', body: JSON.stringify({ id, parent_id: parentId, before_id: beforeId }) }),
+    duplicate: (id: number, data: { title: string; description: string }) =>
+      request<Task>(`/tasks/${id}/duplicate`, { method: 'POST', body: JSON.stringify(data) }),
   },
   logs: {
     list: (params?: Record<string, string>) => {

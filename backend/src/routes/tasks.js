@@ -183,6 +183,50 @@ router.post('/move', (req, res) => {
   }
 });
 
+// タスクの複製（配下の子タスクも再帰的にコピー）
+router.post('/:id/duplicate', (req, res) => {
+  const source = db.prepare('SELECT * FROM tasks WHERE id = ?').get(Number(req.params.id));
+  if (!source) {
+    log({ operation: 'DUPLICATE', resource: 'task', resourceId: Number(req.params.id), result: 'failure', detail: 'Not found' });
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  const { title = source.title, description = source.description } = req.body;
+
+  try {
+    // 子タスクを再帰的に複製するヘルパー
+    const copyChildren = (srcId, newParentId) => {
+      const children = db.prepare(
+        'SELECT * FROM tasks WHERE parent_id = ? ORDER BY sort_order, created_at'
+      ).all(srcId);
+      for (const child of children) {
+        const r = db.prepare(
+          'INSERT INTO tasks (title, description, status, start_date, due_date, project_id, parent_id) VALUES (?,?,?,?,?,?,?)'
+        ).run(child.title, child.description, child.status, child.start_date, child.due_date, child.project_id, newParentId);
+        copyChildren(child.id, r.lastInsertRowid);
+      }
+    };
+
+    // ルートタスクをタイトル・説明のみ差し替えて複製
+    const rootResult = db.prepare(
+      'INSERT INTO tasks (title, description, status, start_date, due_date, project_id, parent_id) VALUES (?,?,?,?,?,?,?)'
+    ).run(title, description, source.status, source.start_date, source.due_date, source.project_id, source.parent_id);
+
+    copyChildren(source.id, rootResult.lastInsertRowid);
+
+    const newTask = db.prepare(`
+      SELECT t.*, p.name as project_name, p.color as project_color FROM tasks t
+      LEFT JOIN projects p ON t.project_id = p.id WHERE t.id = ?
+    `).get(rootResult.lastInsertRowid);
+
+    log({ operation: 'DUPLICATE', resource: 'task', resourceId: newTask.id, title: newTask.title, result: 'success', detail: `source=${source.id}` });
+    res.status(201).json(newTask);
+  } catch (e) {
+    log({ operation: 'DUPLICATE', resource: 'task', resourceId: Number(req.params.id), title: source.title, result: 'failure', detail: e.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.delete('/:id', (req, res) => {
   const task = db.prepare('SELECT id, title FROM tasks WHERE id = ?').get(req.params.id);
   try {

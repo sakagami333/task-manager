@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash, faPlus, faDiagramSuccessor, faChevronDown, faChevronRight, faLevelUpAlt, faGripVertical } from '@fortawesome/free-solid-svg-icons';
+import { faTrash, faPlus, faDiagramSuccessor, faChevronDown, faChevronRight, faLevelUpAlt, faGripVertical, faCopy } from '@fortawesome/free-solid-svg-icons';
 import { api } from '../api/client';
 import type { Task, Status } from '../types';
 import { DueDateLabel } from './Badges';
@@ -231,6 +231,21 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
     onSuccess: () => { qc.invalidateQueries({ queryKey }); setSubtaskTarget(null); },
   });
 
+  // 複製
+  const [duplicateTarget, setDuplicateTarget] = useState<Task | null>(null);
+  const [dupTitle, setDupTitle] = useState('');
+  const [dupDesc,  setDupDesc]  = useState('');
+  useEffect(() => {
+    if (duplicateTarget) {
+      setDupTitle(duplicateTarget.title);
+      setDupDesc(duplicateTarget.description ?? '');
+    }
+  }, [duplicateTarget]);
+  const duplicateTask = useMutation({
+    mutationFn: () => api.tasks.duplicate(duplicateTarget!.id, { title: dupTitle, description: dupDesc }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey }); setDuplicateTarget(null); },
+  });
+
   const moveTask = useMutation({
     mutationFn: ({ id, parentId, beforeId }: { id: number; parentId: number | null; beforeId: number | null }) =>
       api.tasks.move(id, parentId, beforeId),
@@ -348,6 +363,50 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
             <FontAwesomeIcon icon={faDiagramSuccessor} className="text-gray-400" />
             サブタスクを作成
           </button>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2"
+            onClick={() => { setDuplicateTarget(contextMenu.task); setContextMenu(null); }}
+          >
+            <FontAwesomeIcon icon={faCopy} className="text-gray-400" />
+            複製
+          </button>
+        </div>
+      )}
+
+      {/* 複製モーダル */}
+      {duplicateTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setDuplicateTarget(null)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="font-semibold text-gray-700 mb-1">タスクを複製</h2>
+            <p className="text-xs text-gray-400 mb-4">
+              「{duplicateTarget.title}」と配下の子タスクをすべて複製します。<br />
+              最上位タスクのタイトルと内容を変更できます。
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">タイトル</label>
+            <input
+              className="input w-full mb-3"
+              value={dupTitle}
+              onChange={e => setDupTitle(e.target.value)}
+              autoFocus
+            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">内容</label>
+            <textarea
+              className="input w-full mb-5"
+              rows={4}
+              value={dupDesc}
+              onChange={e => setDupDesc(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setDuplicateTarget(null)}>キャンセル</button>
+              <button
+                className="btn-primary"
+                disabled={!dupTitle.trim() || duplicateTask.isPending}
+                onClick={() => duplicateTask.mutate()}
+              >
+                {duplicateTask.isPending ? '複製中…' : '複製する'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
