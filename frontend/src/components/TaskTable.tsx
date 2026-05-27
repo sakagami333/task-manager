@@ -237,7 +237,7 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
   const [dupDesc,  setDupDesc]  = useState('');
   useEffect(() => {
     if (duplicateTarget) {
-      setDupTitle(duplicateTarget.title);
+      setDupTitle('');
       setDupDesc(duplicateTarget.description ?? '');
     }
   }, [duplicateTarget]);

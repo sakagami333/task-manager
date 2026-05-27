@@ -202,7 +202,7 @@ router.post('/:id/duplicate', (req, res) => {
       for (const child of children) {
         const r = db.prepare(
           'INSERT INTO tasks (title, description, status, start_date, due_date, project_id, parent_id) VALUES (?,?,?,?,?,?,?)'
-        ).run(child.title, child.description, child.status, child.start_date, child.due_date, child.project_id, newParentId);
+        ).run(child.title, child.description, 'open', null, null, child.project_id, newParentId);
         copyChildren(child.id, r.lastInsertRowid);
       }
     };
@@ -210,7 +210,7 @@ router.post('/:id/duplicate', (req, res) => {
     // ルートタスクをタイトル・説明のみ差し替えて複製
     const rootResult = db.prepare(
       'INSERT INTO tasks (title, description, status, start_date, due_date, project_id, parent_id) VALUES (?,?,?,?,?,?,?)'
-    ).run(title, description, source.status, source.start_date, source.due_date, source.project_id, source.parent_id);
+    ).run(title, description, 'open', null, null, source.project_id, source.parent_id);
 
     copyChildren(source.id, rootResult.lastInsertRowid);
 
