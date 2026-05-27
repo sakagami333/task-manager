@@ -1,4 +1,4 @@
-export type Status = 'open' | 'in_progress' | 'on_hold' | 'resolved' | 'closed';
+export type Status = 'open' | 'in_progress' | 'on_hold' | 'closed';
 
 export interface Project {
   id: number;

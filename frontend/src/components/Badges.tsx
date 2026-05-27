@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircle, faSpinner, faPause, faCircleCheck, faCircleXmark } from '@fortawesome/free-solid-svg-icons';
+import { faCircle, faSpinner, faPause, faCircleXmark } from '@fortawesome/free-solid-svg-icons';
 import type { Status } from '../types';
 import { formatDate } from '../utils/date';
 
@@ -7,7 +7,6 @@ const STATUS_CONFIG: Record<Status, { label: string; cls: string; icon: typeof f
   open:        { label: '未着手',   cls: 'bg-white text-gray-700 border border-gray-400', icon: faCircle },
   in_progress: { label: '進行中',   cls: 'bg-blue-600 text-white',                        icon: faSpinner },
   on_hold:     { label: '保留',     cls: 'bg-amber-400 text-white',                       icon: faPause },
-  resolved:    { label: '解決済み', cls: 'bg-green-600 text-white',                       icon: faCircleCheck },
   closed:      { label: '完了',     cls: 'bg-gray-500 text-white',                        icon: faCircleXmark },
 };
 
@@ -23,7 +22,7 @@ export function StatusBadge({ status }: { status: Status }) {
 
 export function DueDateLabel({ dueDate, status }: { dueDate: string | null; status?: Status }) {
   if (!dueDate) return <span className="text-gray-400">-</span>;
-  const done = status === 'closed' || status === 'resolved';
+  const done = status === 'closed';
   const today = new Date(); today.setHours(0,0,0,0);
   const due = new Date(dueDate); due.setHours(0,0,0,0);
   const diff = Math.round((due.getTime() - today.getTime()) / 86400000);

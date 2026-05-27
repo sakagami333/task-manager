@@ -44,7 +44,6 @@ export function TaskForm({ initial, parentId, onSubmit, onCancel }: Props) {
             <option value="open">未着手</option>
             <option value="in_progress">進行中</option>
             <option value="on_hold">保留</option>
-            <option value="resolved">解決済み</option>
             <option value="closed">完了</option>
           </select>
         </div>

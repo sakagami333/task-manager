@@ -241,7 +241,7 @@ export function TaskDetailPage() {
                 <li key={child.id} className="py-2 flex items-center gap-3">
                   <input
                     type="checkbox"
-                    checked={child.status === 'closed' || child.status === 'resolved'}
+                    checked={child.status === 'closed'}
                     onChange={e => update.mutate({ ...child, status: e.target.checked ? 'closed' : 'open' })}
                     className="w-4 h-4 rounded cursor-pointer"
                   />

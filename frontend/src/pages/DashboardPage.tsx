@@ -33,7 +33,6 @@ function MiniTaskList({ tasks, emptyMsg }: { tasks: Task[]; emptyMsg: string }) 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   open:        { label: '未着手',   cls: 'bg-gray-200 text-gray-700' },
   in_progress: { label: '進行中',   cls: 'bg-blue-500 text-white' },
-  resolved:    { label: '解決済み', cls: 'bg-green-500 text-white' },
   closed:      { label: '完了',     cls: 'bg-gray-500 text-white' },
 };
 

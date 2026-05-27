@@ -53,14 +53,14 @@ router.get('/dashboard', (req, res) => {
   const overdue = db.prepare(`
     SELECT t.*, p.name as project_name, p.color as project_color FROM tasks t
     LEFT JOIN projects p ON t.project_id = p.id
-    WHERE t.due_date < ? AND t.status NOT IN ('closed','resolved') AND t.parent_id IS NULL
+    WHERE t.due_date < ? AND t.status NOT IN ('closed') AND t.parent_id IS NULL
     ORDER BY t.due_date ASC
   `).all(today);
 
   const dueThisWeek = db.prepare(`
     SELECT t.*, p.name as project_name, p.color as project_color FROM tasks t
     LEFT JOIN projects p ON t.project_id = p.id
-    WHERE t.due_date >= ? AND t.due_date <= ? AND t.status NOT IN ('closed','resolved') AND t.parent_id IS NULL
+    WHERE t.due_date >= ? AND t.due_date <= ? AND t.status NOT IN ('closed') AND t.parent_id IS NULL
     ORDER BY t.due_date ASC
   `).all(today, weekStr);
 

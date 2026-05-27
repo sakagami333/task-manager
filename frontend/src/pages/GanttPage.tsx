@@ -12,14 +12,13 @@ import { formatDate } from '../utils/date';
 
 // ステータス → 進捗率
 const STATUS_PROGRESS: Record<string, number> = {
-  open: 0, in_progress: 50, on_hold: 30, resolved: 90, closed: 100,
+  open: 0, in_progress: 50, on_hold: 30, closed: 100,
 };
 // ステータス → バー色
 const STATUS_COLOR: Record<string, string> = {
   open:        '#9ca3af',
   in_progress: '#3b82f6',
   on_hold:     '#f59e0b',
-  resolved:    '#10b981',
   closed:      '#6b7280',
 };
 
@@ -404,7 +403,7 @@ export function GanttPage() {
 
       {/* 凡例 */}
       <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-500">
-        {Object.entries({ '未着手': '#9ca3af', '進行中': '#3b82f6', '保留': '#f59e0b', '解決済み': '#10b981', '完了': '#6b7280' }).map(([label, color]) => (
+        {Object.entries({ '未着手': '#9ca3af', '進行中': '#3b82f6', '保留': '#f59e0b', '完了': '#6b7280' }).map(([label, color]) => (
           <span key={label} className="flex items-center gap-1">
             <span className="inline-block w-3 h-3 rounded" style={{ background: color }} />
             {label}

@@ -13,7 +13,6 @@ const STATUS_OPTIONS: { value: Status; label: string }[] = [
   { value: 'open',        label: '未着手' },
   { value: 'in_progress', label: '進行中' },
   { value: 'on_hold',     label: '保留' },
-  { value: 'resolved',    label: '解決済み' },
   { value: 'closed',      label: '完了' },
 ];
 
@@ -69,12 +68,11 @@ function TaskRow({
   });
 
   const isOverdue = task.due_date && new Date(task.due_date) < new Date()
-    && task.status !== 'closed' && task.status !== 'resolved';
+    && task.status !== 'closed';
 
   const baseBg = isOverdue          ? 'bg-red-50 hover:bg-red-100'
     : task.status === 'in_progress' ? 'bg-blue-50 hover:bg-blue-100'
     : task.status === 'on_hold'     ? 'bg-amber-50 hover:bg-amber-100'
-    : task.status === 'resolved'    ? 'bg-emerald-50 hover:bg-emerald-100'
     : task.status === 'closed'      ? 'bg-gray-100 hover:bg-gray-200'
     : 'hover:bg-gray-50';
 

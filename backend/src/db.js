@@ -70,6 +70,8 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN summary TEXT DEFAULT ''"); } catch (
 try { db.exec("ALTER TABLE projects ADD COLUMN sort_order INTEGER DEFAULT 0"); } catch (_) {}
 // Migration: add start_date column if not exists
 try { db.exec("ALTER TABLE tasks ADD COLUMN start_date TEXT"); } catch (_) {}
+// Migration: resolved ステータスを closed に統合
+db.exec("UPDATE tasks SET status = 'closed' WHERE status = 'resolved'");
 // Initialize sort_order for existing projects that have 0
 db.exec("UPDATE projects SET sort_order = id * 10 WHERE sort_order = 0");
 
