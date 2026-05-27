@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -15,6 +15,8 @@ const STATUS_OPTIONS: { value: Status; label: string }[] = [
   { value: 'on_hold',     label: '保留' },
   { value: 'closed',      label: '完了' },
 ];
+
+const CLEAR = '__CLEAR__';
 
 type DropZone = 'before' | 'child' | 'after';
 
@@ -41,6 +43,7 @@ function findParentAndSiblings(
 function TaskRow({
   task, depth = 0, invalidateKey, showProject = true, onRightClick,
   draggingId, dropState, onDragStart, onDragEnd, onDragOverRow, onDropOnRow,
+  selectedIds, onToggleSelect,
 }: {
   task: Task;
   depth?: number;
@@ -53,6 +56,8 @@ function TaskRow({
   onDragEnd: () => void;
   onDragOverRow: (id: number, zone: DropZone) => void;
   onDropOnRow: (id: number) => void;
+  selectedIds: Set<number>;
+  onToggleSelect: (id: number) => void;
 }) {
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(true);
@@ -110,7 +115,7 @@ function TaskRow({
     onDropOnRow(task.id);
   };
 
-  const sharedProps = { draggingId, dropState, onDragStart, onDragEnd, onDragOverRow, onDropOnRow };
+  const sharedProps = { draggingId, dropState, onDragStart, onDragEnd, onDragOverRow, onDropOnRow, selectedIds, onToggleSelect };
 
   return (
     <>
@@ -128,6 +133,14 @@ function TaskRow({
           boxShadow: activeZone === 'before' ? 'inset 0 2px 0 #16a34a' : activeZone === 'after' ? 'inset 0 -2px 0 #16a34a' : undefined,
         }}
       >
+        <td className="table-cell w-8 text-center" onClick={e => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selectedIds.has(task.id)}
+            onChange={() => onToggleSelect(task.id)}
+            className="w-4 h-4 rounded cursor-pointer"
+          />
+        </td>
         <td className="table-cell w-6 text-center text-gray-300 group-hover:text-gray-400 cursor-grab active:cursor-grabbing select-none">
           <FontAwesomeIcon icon={faGripVertical} className="text-xs" />
         </td>
@@ -224,6 +237,31 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dropState, setDropState] = useState<DropState | null>(null);
 
+  // 一括選択
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState('');
+  const [bulkStartDate, setBulkStartDate] = useState('');
+  const [bulkDueDate, setBulkDueDate] = useState('');
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const allTaskIds = useMemo(() => {
+    const ids: number[] = [];
+    const collect = (list: Task[]) => list.forEach(t => { ids.push(t.id); if (t.children?.length) collect(t.children); });
+    collect(tasks);
+    return ids;
+  }, [tasks]);
+
+  const toggleSelect = useCallback((id: number) => setSelectedIds(prev => {
+    const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s;
+  }), []);
+
+  const allChecked = allTaskIds.length > 0 && allTaskIds.every(id => selectedIds.has(id));
+  const someChecked = allTaskIds.some(id => selectedIds.has(id)) && !allChecked;
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someChecked;
+  }, [someChecked]);
+
   const createSubtask = useMutation({
     mutationFn: (data: Partial<Task>) => api.tasks.create(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey }); setSubtaskTarget(null); },
@@ -249,6 +287,25 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
       api.tasks.move(id, parentId, beforeId),
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   });
+
+  const batchUpdateMutation = useMutation({
+    mutationFn: () => {
+      const fields: { status?: string; start_date?: string | null; due_date?: string | null } = {};
+      if (bulkStatus) fields.status = bulkStatus;
+      if (bulkStartDate === CLEAR) fields.start_date = null;
+      else if (bulkStartDate) fields.start_date = bulkStartDate;
+      if (bulkDueDate === CLEAR) fields.due_date = null;
+      else if (bulkDueDate) fields.due_date = bulkDueDate;
+      return api.tasks.batchUpdate([...selectedIds], fields);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      setSelectedIds(new Set());
+      setBulkStatus(''); setBulkStartDate(''); setBulkDueDate('');
+    },
+  });
+
+  const hasChanges = !!(bulkStatus || bulkStartDate || bulkDueDate);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -311,6 +368,8 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
     onDragEnd: handleDragEnd,
     onDragOverRow: (id: number, zone: DropZone) => setDropState({ taskId: id, zone }),
     onDropOnRow: handleDropOnRow,
+    selectedIds,
+    onToggleSelect: toggleSelect,
   };
 
   return (
@@ -319,6 +378,15 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr>
+              <th className="table-header w-8 text-center">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allChecked}
+                  onChange={() => setSelectedIds(allChecked ? new Set() : new Set(allTaskIds))}
+                  className="w-4 h-4 rounded cursor-pointer"
+                />
+              </th>
               <th className="table-header w-6"></th>
               <th className="table-header w-10">#</th>
               <th className="table-header">タイトル</th>
@@ -343,6 +411,88 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
           </tbody>
         </table>
       </div>
+
+      {/* 一括更新ツールバー */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white border border-gray-300 rounded-xl shadow-2xl px-5 py-3 flex items-center gap-4 flex-wrap justify-center">
+          <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+            {selectedIds.size}件選択中
+          </span>
+          <button
+            onClick={() => { setSelectedIds(new Set()); setBulkStatus(''); setBulkStartDate(''); setBulkDueDate(''); }}
+            className="text-gray-400 hover:text-gray-600 text-xs"
+            title="選択を解除"
+          >✕</button>
+          <div className="w-px h-6 bg-gray-200" />
+
+          {/* ステータス */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">ステータス</span>
+            <select
+              value={bulkStatus}
+              onChange={e => setBulkStatus(e.target.value)}
+              className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-400 cursor-pointer"
+            >
+              <option value="">（変更なし）</option>
+              {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+
+          {/* 開始日 */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">開始日</span>
+            {bulkStartDate === CLEAR ? (
+              <>
+                <span className="text-xs text-gray-400 italic">クリア</span>
+                <button onClick={() => setBulkStartDate('')} className="text-xs text-blue-500 hover:text-blue-700">↩取消</button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="date"
+                  value={bulkStartDate}
+                  onChange={e => setBulkStartDate(e.target.value)}
+                  className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400"
+                />
+                {bulkStartDate && (
+                  <button onClick={() => setBulkStartDate(CLEAR)} className="text-xs text-gray-400 hover:text-red-500">×クリア</button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* 期日 */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">期日</span>
+            {bulkDueDate === CLEAR ? (
+              <>
+                <span className="text-xs text-gray-400 italic">クリア</span>
+                <button onClick={() => setBulkDueDate('')} className="text-xs text-blue-500 hover:text-blue-700">↩取消</button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="date"
+                  value={bulkDueDate}
+                  onChange={e => setBulkDueDate(e.target.value)}
+                  className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400"
+                />
+                {bulkDueDate && (
+                  <button onClick={() => setBulkDueDate(CLEAR)} className="text-xs text-gray-400 hover:text-red-500">×クリア</button>
+                )}
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={() => batchUpdateMutation.mutate()}
+            disabled={!hasChanges || batchUpdateMutation.isPending}
+            className="btn-primary text-sm px-4 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {batchUpdateMutation.isPending ? '適用中…' : '適用する'}
+          </button>
+        </div>
+      )}
 
       {/* 右クリックメニュー */}
       {contextMenu && (

@@ -147,6 +147,31 @@ router.put('/:id', (req, res) => {
   }
 });
 
+// タスクの一括更新
+router.post('/batch-update', (req, res) => {
+  const { ids, fields } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0)
+    return res.status(400).json({ error: 'ids is required' });
+
+  const sets = [], params = [];
+  if ('status'     in fields) { sets.push('status = ?');     params.push(fields.status); }
+  if ('start_date' in fields) { sets.push('start_date = ?'); params.push(fields.start_date ?? null); }
+  if ('due_date'   in fields) { sets.push('due_date = ?');   params.push(fields.due_date ?? null); }
+  if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  sets.push("updated_at = datetime('now','localtime')");
+
+  try {
+    db.exec('BEGIN');
+    const stmt = db.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`);
+    for (const id of ids) stmt.run(...params, id);
+    db.exec('COMMIT');
+    res.status(204).end();
+  } catch (e) {
+    db.exec('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // タスクの移動（並び替え・親変更）
 router.post('/move', (req, res) => {
   const { id, parent_id, before_id } = req.body;

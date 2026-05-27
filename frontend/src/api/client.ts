@@ -34,6 +34,8 @@ export const api = {
       request<void>('/tasks/move', { method: 'POST', body: JSON.stringify({ id, parent_id: parentId, before_id: beforeId }) }),
     duplicate: (id: number, data: { title: string; description: string }) =>
       request<Task>(`/tasks/${id}/duplicate`, { method: 'POST', body: JSON.stringify(data) }),
+    batchUpdate: (ids: number[], fields: { status?: string; start_date?: string | null; due_date?: string | null }) =>
+      request<void>('/tasks/batch-update', { method: 'POST', body: JSON.stringify({ ids, fields }) }),
   },
   logs: {
     list: (params?: Record<string, string>) => {
