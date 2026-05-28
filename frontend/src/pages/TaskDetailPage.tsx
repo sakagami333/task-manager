@@ -8,7 +8,7 @@ import { TaskForm } from '../components/TaskForm';
 import { StatusBadge, DueDateLabel } from '../components/Badges';
 import { LinkifyText } from '../components/LinkifyText';
 import { formatDateTime } from '../utils/date';
-import type { Task } from '../types';
+import type { Task, Status } from '../types';
 
 function CommentsSection({ taskId }: { taskId: number }) {
   const qc = useQueryClient();
@@ -132,6 +132,16 @@ export function TaskDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['task', id] }),
   });
 
+  // サブタスクのステータス更新（子タスク自身のIDで更新。親IDで上書きしないよう専用ミューテーションを使う）
+  const updateSubStatus = useMutation({
+    mutationFn: ({ subId, status }: { subId: number; status: Status }) =>
+      api.tasks.update(subId, { status }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['task', id] });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+
   if (isLoading) return <div className="text-gray-400 p-8 text-center">読み込み中...</div>;
   if (!task) return <div className="text-red-500 p-8 text-center">タスクが見つかりません</div>;
 
@@ -242,7 +252,7 @@ export function TaskDetailPage() {
                   <input
                     type="checkbox"
                     checked={child.status === 'closed'}
-                    onChange={e => update.mutate({ ...child, status: e.target.checked ? 'closed' : 'open' })}
+                    onChange={e => updateSubStatus.mutate({ subId: child.id, status: e.target.checked ? 'closed' : 'open' })}
                     className="w-4 h-4 rounded cursor-pointer"
                   />
                   <Link to={`/tasks/${child.id}`} className={`flex-1 text-sm hover:underline ${child.status === 'closed' ? 'line-through text-gray-400' : 'text-blue-700'}`}>
