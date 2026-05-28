@@ -85,7 +85,7 @@ function TaskRow({
   const activeZone  = dropState?.taskId === task.id ? dropState.zone : null;
 
   const handleDragStart = (e: React.DragEvent) => {
-    if ((e.target as HTMLElement).closest('a, button, select, input')) {
+    if ((e.target as HTMLElement).closest('a, button, select, input, [data-no-drag]')) {
       e.preventDefault();
       return;
     }
@@ -133,7 +133,7 @@ function TaskRow({
           boxShadow: activeZone === 'before' ? 'inset 0 2px 0 #16a34a' : activeZone === 'after' ? 'inset 0 -2px 0 #16a34a' : undefined,
         }}
       >
-        <td className="table-cell w-8 text-center" onClick={e => e.stopPropagation()}>
+        <td className="table-cell w-8 text-center" data-no-drag="" onClick={e => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={selectedIds.has(task.id)}
