@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash, faPlus, faDiagramSuccessor, faChevronDown, faChevronRight, faLevelUpAlt, faGripVertical, faCopy } from '@fortawesome/free-solid-svg-icons';
+import { faTrash, faPlus, faDiagramSuccessor, faChevronDown, faChevronRight, faLevelUpAlt, faGripVertical, faCopy, faPen } from '@fortawesome/free-solid-svg-icons';
 import { api } from '../api/client';
 import type { Task, Status } from '../types';
 import { DueDateLabel } from './Badges';
@@ -62,6 +62,7 @@ function TaskRow({
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(true);
   const hasChildren = task.children && task.children.length > 0;
+  const isSelected = selectedIds.has(task.id);
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: number; status: Status }) => api.tasks.update(id, { status }),
@@ -85,13 +86,12 @@ function TaskRow({
   const activeZone  = dropState?.taskId === task.id ? dropState.zone : null;
 
   const handleDragStart = (e: React.DragEvent) => {
-    if ((e.target as HTMLElement).closest('a, button, select, input, [data-no-drag]')) {
+    if ((e.target as HTMLElement).closest('a, button, select, input')) {
       e.preventDefault();
       return;
     }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', String(task.id));
-    // ブラウザの半透明ゴーストを消す（1×1 透明画像）
     const ghost = document.createElement('div');
     ghost.style.cssText = 'position:fixed;top:-9999px';
     document.body.appendChild(ghost);
@@ -115,6 +115,12 @@ function TaskRow({
     onDropOnRow(task.id);
   };
 
+  // 行クリックで選択トグル（リンク・ボタン・select・ドラッグハンドル上はスキップ）
+  const handleRowClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('a, button, select, input, [data-no-select]')) return;
+    onToggleSelect(task.id);
+  };
+
   const sharedProps = { draggingId, dropState, onDragStart, onDragEnd, onDragOverRow, onDropOnRow, selectedIds, onToggleSelect };
 
   return (
@@ -126,22 +132,24 @@ function TaskRow({
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         onContextMenu={e => { e.preventDefault(); onRightClick(e, task); }}
-        className={`transition-colors ${isDragging ? 'opacity-40' : ''} ${activeZone === 'child' ? 'bg-green-50 ring-2 ring-inset ring-green-400' : baseBg} ${task.status === 'closed' ? 'text-gray-400' : ''}`}
+        onClick={handleRowClick}
+        className={`transition-colors cursor-pointer select-none ${isDragging ? 'opacity-40' : ''} ${
+          isSelected
+            ? 'bg-blue-100 hover:bg-blue-200'
+            : activeZone === 'child' ? 'bg-green-50 ring-2 ring-inset ring-green-400'
+            : baseBg
+        } ${task.status === 'closed' ? 'text-gray-400' : ''}`}
         style={{
           outline: activeZone === 'before' ? '2px solid #16a34a' : activeZone === 'after' ? '2px solid #16a34a' : undefined,
           outlineOffset: activeZone === 'before' ? '-1px' : activeZone === 'after' ? '-1px' : undefined,
-          boxShadow: activeZone === 'before' ? 'inset 0 2px 0 #16a34a' : activeZone === 'after' ? 'inset 0 -2px 0 #16a34a' : undefined,
+          boxShadow: isSelected
+            ? 'inset 0 0 0 2px #3b82f6'
+            : activeZone === 'before' ? 'inset 0 2px 0 #16a34a'
+            : activeZone === 'after'  ? 'inset 0 -2px 0 #16a34a'
+            : undefined,
         }}
       >
-        <td className="table-cell w-8 text-center" data-no-drag="" onClick={e => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            checked={selectedIds.has(task.id)}
-            onChange={() => onToggleSelect(task.id)}
-            className="w-4 h-4 rounded cursor-pointer"
-          />
-        </td>
-        <td className="table-cell w-6 text-center text-gray-300 group-hover:text-gray-400 cursor-grab active:cursor-grabbing select-none">
+        <td className="table-cell w-6 text-center text-gray-300 cursor-grab active:cursor-grabbing select-none" data-no-select="">
           <FontAwesomeIcon icon={faGripVertical} className="text-xs" />
         </td>
         <td className="table-cell w-10 text-gray-400 text-xs">{task.id}</td>
@@ -239,28 +247,23 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
 
   // 一括選択
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [bulkStatus, setBulkStatus] = useState('');
   const [bulkStartDate, setBulkStartDate] = useState('');
   const [bulkDueDate, setBulkDueDate] = useState('');
-  const selectAllRef = useRef<HTMLInputElement>(null);
-
-  const allTaskIds = useMemo(() => {
-    const ids: number[] = [];
-    const collect = (list: Task[]) => list.forEach(t => { ids.push(t.id); if (t.children?.length) collect(t.children); });
-    collect(tasks);
-    return ids;
-  }, [tasks]);
 
   const toggleSelect = useCallback((id: number) => setSelectedIds(prev => {
     const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s;
   }), []);
 
-  const allChecked = allTaskIds.length > 0 && allTaskIds.every(id => selectedIds.has(id));
-  const someChecked = allTaskIds.some(id => selectedIds.has(id)) && !allChecked;
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
+  // Escape で選択解除
   useEffect(() => {
-    if (selectAllRef.current) selectAllRef.current.indeterminate = someChecked;
-  }, [someChecked]);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') clearSelection(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [clearSelection]);
 
   const createSubtask = useMutation({
     mutationFn: (data: Partial<Task>) => api.tasks.create(data),
@@ -302,6 +305,7 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
       qc.invalidateQueries({ queryKey });
       setSelectedIds(new Set());
       setBulkStatus(''); setBulkStartDate(''); setBulkDueDate('');
+      setBulkModalOpen(false);
     },
   });
 
@@ -362,6 +366,9 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
     return <div className="text-center py-12 text-gray-400">タスクがありません</div>;
   }
 
+  // 右クリック時に2件以上選択済みかつ対象行が選択中 → 一括更新メニューを表示
+  const isBulkContext = contextMenu !== null && selectedIds.size >= 2 && selectedIds.has(contextMenu.task.id);
+
   const sharedProps = {
     draggingId, dropState,
     onDragStart: setDraggingId,
@@ -374,19 +381,21 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
 
   return (
     <>
+      {/* 選択中インジケーター */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 text-xs text-blue-600 mb-2 px-1">
+          <span>{selectedIds.size}件選択中</span>
+          <span className="text-gray-400">·</span>
+          <span className="text-gray-400">右クリックで一括更新</span>
+          <span className="text-gray-400">·</span>
+          <button onClick={clearSelection} className="text-gray-400 hover:text-gray-600 underline">選択解除</button>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th className="table-header w-8 text-center">
-                <input
-                  ref={selectAllRef}
-                  type="checkbox"
-                  checked={allChecked}
-                  onChange={() => setSelectedIds(allChecked ? new Set() : new Set(allTaskIds))}
-                  className="w-4 h-4 rounded cursor-pointer"
-                />
-              </th>
               <th className="table-header w-6"></th>
               <th className="table-header w-10">#</th>
               <th className="table-header">タイトル</th>
@@ -412,98 +421,31 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
         </table>
       </div>
 
-      {/* 一括更新ツールバー */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white border border-gray-300 rounded-xl shadow-2xl px-5 py-3 flex items-center gap-4 flex-wrap justify-center">
-          <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-            {selectedIds.size}件選択中
-          </span>
-          <button
-            onClick={() => { setSelectedIds(new Set()); setBulkStatus(''); setBulkStartDate(''); setBulkDueDate(''); }}
-            className="text-gray-400 hover:text-gray-600 text-xs"
-            title="選択を解除"
-          >✕</button>
-          <div className="w-px h-6 bg-gray-200" />
-
-          {/* ステータス */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">ステータス</span>
-            <select
-              value={bulkStatus}
-              onChange={e => setBulkStatus(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-400 cursor-pointer"
-            >
-              <option value="">（変更なし）</option>
-              {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-
-          {/* 開始日 */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">開始日</span>
-            {bulkStartDate === CLEAR ? (
-              <>
-                <span className="text-xs text-gray-400 italic">クリア</span>
-                <button onClick={() => setBulkStartDate('')} className="text-xs text-blue-500 hover:text-blue-700">↩取消</button>
-              </>
-            ) : (
-              <>
-                <input
-                  type="date"
-                  value={bulkStartDate}
-                  onChange={e => setBulkStartDate(e.target.value)}
-                  className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400"
-                />
-                {bulkStartDate && (
-                  <button onClick={() => setBulkStartDate(CLEAR)} className="text-xs text-gray-400 hover:text-red-500">×クリア</button>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* 期日 */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">期日</span>
-            {bulkDueDate === CLEAR ? (
-              <>
-                <span className="text-xs text-gray-400 italic">クリア</span>
-                <button onClick={() => setBulkDueDate('')} className="text-xs text-blue-500 hover:text-blue-700">↩取消</button>
-              </>
-            ) : (
-              <>
-                <input
-                  type="date"
-                  value={bulkDueDate}
-                  onChange={e => setBulkDueDate(e.target.value)}
-                  className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400"
-                />
-                {bulkDueDate && (
-                  <button onClick={() => setBulkDueDate(CLEAR)} className="text-xs text-gray-400 hover:text-red-500">×クリア</button>
-                )}
-              </>
-            )}
-          </div>
-
-          <button
-            onClick={() => batchUpdateMutation.mutate()}
-            disabled={!hasChanges || batchUpdateMutation.isPending}
-            className="btn-primary text-sm px-4 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            {batchUpdateMutation.isPending ? '適用中…' : '適用する'}
-          </button>
-        </div>
-      )}
-
       {/* 右クリックメニュー */}
       {contextMenu && (
         <div
           ref={menuRef}
-          className="fixed z-50 bg-white border border-gray-200 rounded shadow-lg py-1 min-w-[160px]"
+          className="fixed z-50 bg-white border border-gray-200 rounded shadow-lg py-1 min-w-[170px]"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
-          <div className="px-3 py-1 text-xs text-gray-400 border-b border-gray-100 truncate max-w-[200px]">
-            {contextMenu.task.title}
+          <div className="px-3 py-1 text-xs text-gray-400 border-b border-gray-100 truncate max-w-[210px]">
+            {isBulkContext ? `${selectedIds.size}件選択中` : contextMenu.task.title}
           </div>
+
+          {/* 一括更新（2件以上選択時かつ選択行を右クリックした場合のみ表示） */}
+          {isBulkContext && (
+            <>
+              <button
+                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2 text-blue-700 font-medium"
+                onClick={() => { setBulkModalOpen(true); setContextMenu(null); }}
+              >
+                <FontAwesomeIcon icon={faPen} className="text-blue-500" />
+                {selectedIds.size}件を一括更新...
+              </button>
+              <div className="border-t border-gray-100 my-1" />
+            </>
+          )}
+
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2"
             onClick={handleCreateSubtask}
@@ -518,6 +460,91 @@ export function TaskTable({ tasks, queryKey, showProject = true }: Props) {
             <FontAwesomeIcon icon={faCopy} className="text-gray-400" />
             複製
           </button>
+        </div>
+      )}
+
+      {/* 一括更新モーダル */}
+      {bulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setBulkModalOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="font-semibold text-gray-700 mb-1">一括更新</h2>
+            <p className="text-xs text-gray-400 mb-5">
+              {selectedIds.size}件のタスクをまとめて更新します。空欄のままにした項目は変更されません。
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="form-label">ステータス</label>
+                <select
+                  value={bulkStatus}
+                  onChange={e => setBulkStatus(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="">（変更なし）</option>
+                  {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">開始日</label>
+                <div className="flex items-center gap-2">
+                  {bulkStartDate === CLEAR ? (
+                    <>
+                      <span className="text-sm text-gray-400 italic flex-1">クリア（未設定に変更）</span>
+                      <button onClick={() => setBulkStartDate('')} className="text-xs text-blue-500 hover:text-blue-700">↩取消</button>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="date"
+                        value={bulkStartDate}
+                        onChange={e => setBulkStartDate(e.target.value)}
+                        className="form-input flex-1"
+                      />
+                      {bulkStartDate && (
+                        <button onClick={() => setBulkStartDate(CLEAR)} className="text-xs text-gray-400 hover:text-red-500 whitespace-nowrap">×クリア</button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">期日</label>
+                <div className="flex items-center gap-2">
+                  {bulkDueDate === CLEAR ? (
+                    <>
+                      <span className="text-sm text-gray-400 italic flex-1">クリア（未設定に変更）</span>
+                      <button onClick={() => setBulkDueDate('')} className="text-xs text-blue-500 hover:text-blue-700">↩取消</button>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="date"
+                        value={bulkDueDate}
+                        onChange={e => setBulkDueDate(e.target.value)}
+                        className="form-input flex-1"
+                      />
+                      {bulkDueDate && (
+                        <button onClick={() => setBulkDueDate(CLEAR)} className="text-xs text-gray-400 hover:text-red-500 whitespace-nowrap">×クリア</button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button className="btn-secondary" onClick={() => setBulkModalOpen(false)}>キャンセル</button>
+              <button
+                className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={!hasChanges || batchUpdateMutation.isPending}
+                onClick={() => batchUpdateMutation.mutate()}
+              >
+                {batchUpdateMutation.isPending ? '適用中…' : `${selectedIds.size}件に適用する`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
