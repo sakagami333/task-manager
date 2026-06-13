@@ -26,6 +26,6 @@ echo Build complete.
 echo.
 
 echo [3/3] Starting server (http://localhost:3001)...
-start "TaskManager" cmd /k "cd /d "%BASE%backend" && node src/server.js"
+start "TaskManager" cmd /k "cd /d "%BASE%backend" && set NODE_ENV=production && node src/server.js"
 timeout /t 3 /nobreak > nul
 start "" http://localhost:3001
